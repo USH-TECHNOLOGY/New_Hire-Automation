@@ -1,0 +1,59 @@
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from playwright.sync_api import sync_playwright
+
+# Initialize gspread with Google Sheets
+def init_gspread():
+    creds_json = 'path/to/your/credentials.json'
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_json, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open("Your Spreadsheet Name").sheet1
+    return sheet
+
+# Read spreadsheet data
+def read_spreadsheet(sheet):
+    first_names = sheet.col_values(sheet.find("First Name").col)[1:]  # Skip header
+    last_names = sheet.col_values(sheet.find("Last Name").col)[1:]  # Skip header
+    return first_names, last_names
+
+# Function to create a Google Workspace account using Playwright
+def create_google_workspace_account(first_name, last_name):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # Set headless=False to see the browser
+        page = browser.new_page()
+
+        page.goto("https://admin.google.com/")
+
+        # Modify these selectors based on your login page structure
+        page.fill('input[type="email"]', 'your_admin_email@example.com')
+        page.click('button[type="submit"]')
+        page.fill('input[type="password"]', 'your_admin_password')
+        page.click('button[type="submit"]')
+        
+        page.wait_for_navigation()
+        page.goto("https://admin.google.com/ac/users")
+
+        page.click('text="Add new user"')
+
+        email = f"{first_name}.{last_name}@ushunger.org".lower()
+        page.fill('input[name="FirstName"]', first_name)
+        page.fill('input[name="LastName"]', last_name)
+        page.fill('input[name="Email"]', email)
+
+        # Uncomment and modify if there's a domain dropdown
+        # page.select_option('select#domain', 'ushunger.org')
+
+        page.click('button[type="submit"]')
+        browser.close()
+
+# Main function
+def main():
+    sheet = init_gspread()
+    first_names, last_names = read_spreadsheet(sheet)
+
+    for first_name, last_name in zip(first_names, last_names):
+        create_google_workspace_account(first_name, last_name)
+
+if __name__ == "__main__":
+    main()
